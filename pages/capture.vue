@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { ref, onUnmounted } from 'vue'
+import { navigateTo } from 'nuxt/app'
+import { usePhotoDb } from '~/composables/usePhotoDb'
+
 const db = usePhotoDb()
 const previewUrl = ref('')
 const selectedFile = ref<File | null>(null)
@@ -11,7 +15,7 @@ function revokePreview() {
   }
 }
 
-function handleFile(event: Event) {
+async function handleFile(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
 
@@ -21,6 +25,7 @@ function handleFile(event: Event) {
 
   if (file) {
     previewUrl.value = URL.createObjectURL(file)
+    await saveAndClassify()
   }
 }
 
@@ -30,9 +35,13 @@ async function saveAndClassify() {
     return
   }
 
-  await db.init()
-  await db.saveDraft(selectedFile.value)
-  await navigateTo('/classify')
+  try {
+    await db.init()
+    await db.saveDraft(selectedFile.value)
+    await navigateTo('/classify')
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '保存に失敗しました。'
+  }
 }
 
 onUnmounted(revokePreview)

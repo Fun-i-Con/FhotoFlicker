@@ -61,6 +61,10 @@ async function submitCategory() {
 }
 
 async function removeCategory(category: Category) {
+  if (!confirm('このカテゴリを削除しますか？')) {
+    return
+  }
+
   await db.deleteCategory(category.id)
   await load()
   if (form.id === category.id) {

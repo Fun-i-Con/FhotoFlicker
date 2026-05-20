@@ -33,6 +33,10 @@ async function removePhoto() {
     return
   }
 
+  if (!confirm('この写真を削除しますか？')) {
+    return
+  }
+
   await db.deletePhoto(photo.value.id)
   await navigateTo('/photos')
 }

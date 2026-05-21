@@ -9,12 +9,23 @@ export interface Category {
   updatedAt: string
 }
 
+export interface Place {
+  id: string
+  name: string
+  latitude: number
+  longitude: number
+  radiusMeters: number
+  createdAt: string
+  updatedAt: string
+}
+
 export interface PhotoItem {
   id: string
   image: Blob
   imageType: string
   categoryId: string
   direction: FlickDirection
+  placeId?: string
   createdAt: string
 }
 
@@ -22,6 +33,7 @@ export interface DraftPhoto {
   id: string
   image: Blob
   imageType: string
+  placeId?: string
   createdAt: string
 }
 

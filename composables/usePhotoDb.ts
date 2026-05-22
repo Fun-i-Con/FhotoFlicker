@@ -51,11 +51,18 @@ function openDb() {
         db.createObjectStore('drafts', { keyPath: 'id' })
       }
 
-      if (!db.objectStoreNames.contains('photos')) {
-        const photos = db.createObjectStore('photos', { keyPath: 'id' })
+      const photos = db.objectStoreNames.contains('photos')
+        ? request.transaction!.objectStore('photos')
+        : db.createObjectStore('photos', { keyPath: 'id' })
+
+      if (!photos.indexNames.contains('categoryId')) {
         photos.createIndex('categoryId', 'categoryId')
+      }
+      if (!photos.indexNames.contains('createdAt')) {
         photos.createIndex('createdAt', 'createdAt')
-        photos.createIndex('placeId', 'placeId') 
+      }
+      if (!photos.indexNames.contains('placeId')) {
+        photos.createIndex('placeId', 'placeId')
       }
 
       if (!db.objectStoreNames.contains('settings')) {
@@ -277,7 +284,10 @@ async function getPlaces() {
 }
 
 // 場所を保存
-async function savePlace(input: Omit<Place, 'createdAt' | 'updatedAt'> & { id?: string }) {
+async function savePlace(input: Omit<Place, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) {
+  const places = await getPlaces()
+  const existing = input.id ? places.find((place) => place.id === input.id) : undefined
+
   const now = new Date().toISOString()
   const place: Place = {
     id: input.id || createId('place'),
@@ -285,7 +295,7 @@ async function savePlace(input: Omit<Place, 'createdAt' | 'updatedAt'> & { id?: 
     latitude: input.latitude,
     longitude: input.longitude,
     radiusMeters: input.radiusMeters,
-    createdAt: now,
+    createdAt: existing?.createdAt || now,
     updatedAt: now
   }
 

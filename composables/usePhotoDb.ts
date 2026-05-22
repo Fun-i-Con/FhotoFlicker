@@ -4,13 +4,14 @@ import {
   type Category,
   type DraftPhoto,
   type FlickDirection,
-  type PhotoItem
+  type PhotoItem,
+  type Place
 } from '~/types/photo'
 
 const DB_NAME = 'photo-flick-sorter'
-const DB_VERSION = 2
+const DB_VERSION = 3
 
-type StoreName = 'categories' | 'drafts' | 'photos' | 'settings'
+type StoreName = 'categories' | 'drafts' | 'photos' | 'settings' | 'places'
 
 const defaultColors: Record<FlickDirection, string> = {
   up: '#2563eb',
@@ -50,14 +51,26 @@ function openDb() {
         db.createObjectStore('drafts', { keyPath: 'id' })
       }
 
-      if (!db.objectStoreNames.contains('photos')) {
-        const photos = db.createObjectStore('photos', { keyPath: 'id' })
+      const photos = db.objectStoreNames.contains('photos')
+        ? request.transaction!.objectStore('photos')
+        : db.createObjectStore('photos', { keyPath: 'id' })
+
+      if (!photos.indexNames.contains('categoryId')) {
         photos.createIndex('categoryId', 'categoryId')
+      }
+      if (!photos.indexNames.contains('createdAt')) {
         photos.createIndex('createdAt', 'createdAt')
+      }
+      if (!photos.indexNames.contains('placeId')) {
+        photos.createIndex('placeId', 'placeId')
       }
 
       if (!db.objectStoreNames.contains('settings')) {
         db.createObjectStore('settings', { keyPath: 'key' })
+      }
+      if (!db.objectStoreNames.contains('places')) {
+        const places = db.createObjectStore('places', { keyPath: 'id' })
+        places.createIndex('createdAt', 'createdAt')
       }
     }
 
@@ -189,11 +202,12 @@ export function usePhotoDb() {
     await withStore<undefined>('categories', 'readwrite', (store) => store.delete(id))
   }
 
-  async function saveDraft(file: File) {
+  async function saveDraft(file: File, placeId?: string) {
     const draft: DraftPhoto = {
       id: createId('draft'),
       image: file,
       imageType: file.type || 'image/jpeg',
+      placeId,
       createdAt: new Date().toISOString()
     }
 
@@ -223,6 +237,7 @@ export function usePhotoDb() {
       imageType: draft.imageType,
       categoryId: category.id,
       direction,
+      placeId: draft.placeId,
       createdAt: new Date().toISOString()
     }
 
@@ -231,10 +246,23 @@ export function usePhotoDb() {
     return photo
   }
 
-  async function getPhotos(categoryId?: string) {
+  async function getPhotos(categoryIdOrFilters?: string | { placeId?: string; categoryId?: string }) {
     const photos = await getAllFromStore<PhotoItem>('photos')
+    
+    // categoryId 単体を渡された場合の互換性保持
+    if (typeof categoryIdOrFilters === 'string') {
+      return photos
+        .filter((photo) => !categoryIdOrFilters || photo.categoryId === categoryIdOrFilters)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    }
+
+    // フィルターオブジェクトの場合
+    const { categoryId, placeId } = categoryIdOrFilters || {}
     return photos
-      .filter((photo) => !categoryId || photo.categoryId === categoryId)
+      .filter((photo) => 
+        (!categoryId || photo.categoryId === categoryId) &&
+        (!placeId || photo.placeId === placeId)
+      )
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   }
 
@@ -250,6 +278,68 @@ export function usePhotoDb() {
     return URL.createObjectURL(item.image)
   }
 
+  // 場所一覧を取得
+async function getPlaces() {
+  return await getAllFromStore<Place>('places')
+}
+
+// 場所を保存
+async function savePlace(input: Omit<Place, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) {
+  const places = await getPlaces()
+  const existing = input.id ? places.find((place) => place.id === input.id) : undefined
+
+  const now = new Date().toISOString()
+  const place: Place = {
+    id: input.id || createId('place'),
+    name: input.name.trim(),
+    latitude: input.latitude,
+    longitude: input.longitude,
+    radiusMeters: input.radiusMeters,
+    createdAt: existing?.createdAt || now,
+    updatedAt: now
+  }
+
+  await withStore<IDBValidKey>('places', 'readwrite', (store) => store.put(place))
+  return place
+}
+
+// 場所を削除
+async function deletePlace(id: string) {
+  await withStore<undefined>('places', 'readwrite', (store) => store.delete(id))
+}
+
+// 現在地から最寄り場所を見つける（Haversine公式を使用）
+async function findNearestPlace(latitude: number, longitude: number): Promise<Place | null> {
+  const places = await getPlaces()
+  
+  if (places.length === 0) return null
+
+  // Haversine公式で距離を計算
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371 // 地球の半径（km）
+    const dLat = ((lat2 - lat1) * Math.PI) / 180
+    const dLon = ((lon2 - lon1) * Math.PI) / 180
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return R * c * 1000 // メートル単位
+  }
+
+  let nearest: Place | null = null
+  let minDistance = Infinity
+
+  places.forEach((place) => {
+    const distance = calculateDistance(latitude, longitude, place.latitude, place.longitude)
+    if (distance <= place.radiusMeters && distance < minDistance) {
+      nearest = place
+      minDistance = distance
+    }
+  })
+
+  return nearest
+}
+
   return {
     isReady,
     errorMessage,
@@ -263,6 +353,10 @@ export function usePhotoDb() {
     getPhotos,
     getPhoto,
     deletePhoto,
-    createObjectUrl
+    createObjectUrl,
+    getPlaces,
+    savePlace,
+    deletePlace,
+    findNearestPlace
   }
 }

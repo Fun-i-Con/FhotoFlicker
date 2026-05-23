@@ -4,16 +4,25 @@ import {
   flickDirections,
   type Category,
   type DraftPhoto,
-  type FlickDirection
+  type FlickDirection,
+  type Place
 } from '~/types/photo'
 
 const db = usePhotoDb()
 const categories = ref<Category[]>([])
+const places = ref<Place[]>([])
 const draft = ref<DraftPhoto | null>(null)
 const imageUrl = ref('')
 const error = ref('')
 const startPoint = ref<{ x: number; y: number } | null>(null)
 const activeDirection = ref<FlickDirection | null>(null)
+const currentPlaceName = computed(() => {
+  if (!draft.value?.placeId) {
+    return '場所未設定'
+  }
+
+  return places.value.find((place) => place.id === draft.value?.placeId)?.name || '場所未設定'
+})
 
 function revokeImage() {
   if (imageUrl.value) {
@@ -25,6 +34,7 @@ function revokeImage() {
 async function load() {
   await db.init()
   categories.value = await db.getCategories()
+  places.value = await db.getPlaces()
   draft.value = await db.getLatestDraft()
   revokeImage()
 
@@ -101,11 +111,15 @@ onUnmounted(revokeImage)
 <template>
   <AppShell>
     <h1 class="page-title">フリック分類</h1>
-    <p class="page-lead">写真を上下左右にフリックすると、対応するカテゴリへ保存されます。</p>
+    <p class="page-lead">写真を上下左右にフリックすると、対応する工程へ保存されます。</p>
 
     <DirectionMap :categories="categories" />
 
     <section v-if="draft && imageUrl" class="classify-stage">
+      <div class="field">
+        <span>現在の場所</span>
+        <strong>{{ currentPlaceName }}</strong>
+      </div>
       <img
         class="classify-image"
         :src="imageUrl"

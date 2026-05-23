@@ -256,20 +256,98 @@ button {
 
 .direction-map {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    ". up ."
+    "left center right"
+    ". down .";
   gap: 10px;
   margin: 16px 0;
+  align-items: stretch;
 }
 
 .direction-tile {
-  min-height: 78px;
+  min-height: 92px;
   display: grid;
-  align-content: center;
+  align-content: space-between;
   gap: 8px;
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in srgb, var(--tile-color, #9ca3af) 34%, white);
   border-radius: 8px;
   padding: 12px;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--tile-color, #9ca3af) 10%, white);
+}
+
+.direction-up {
+  grid-area: up;
+}
+
+.direction-right {
+  grid-area: right;
+}
+
+.direction-down {
+  grid-area: down;
+}
+
+.direction-left {
+  grid-area: left;
+}
+
+.direction-tile-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.direction-arrow {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tile-color, #9ca3af) 22%, white);
+  color: #111827;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.direction-target {
+  display: grid;
+  gap: 4px;
+  min-height: 42px;
+  padding: 10px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.direction-target.is-empty {
+  color: var(--muted);
+}
+
+.direction-center {
+  grid-area: center;
+  min-height: 92px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 6px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background:
+    radial-gradient(circle at center, rgba(17, 24, 39, 0.06), transparent 60%),
+    var(--surface-soft);
+  text-align: center;
+}
+
+.direction-center-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .preview-image,
@@ -370,5 +448,23 @@ button {
 
   .photo-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .direction-map {
+    gap: 8px;
+  }
+
+  .direction-tile,
+  .direction-center {
+    min-height: 84px;
+    padding: 10px;
+  }
+
+  .direction-target {
+    min-height: 38px;
+    padding: 8px;
+    font-size: 13px;
   }
 }

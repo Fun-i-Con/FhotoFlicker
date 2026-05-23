@@ -26,6 +26,11 @@ function createId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
 }
 
+async function normalizeImageForStorage(image: Blob) {
+  const buffer = await image.arrayBuffer()
+  return new Blob([buffer], { type: image.type || 'image/jpeg' })
+}
+
 function openDb() {
   if (dbPromise) {
     return dbPromise
@@ -203,10 +208,11 @@ export function usePhotoDb() {
   }
 
   async function saveDraft(file: File, placeId?: string) {
+    const normalizedImage = await normalizeImageForStorage(file)
     const draft: DraftPhoto = {
       id: createId('draft'),
-      image: file,
-      imageType: file.type || 'image/jpeg',
+      image: normalizedImage,
+      imageType: normalizedImage.type || 'image/jpeg',
       placeId,
       createdAt: new Date().toISOString()
     }
@@ -231,10 +237,11 @@ export function usePhotoDb() {
       throw new Error(`${directionLabels[direction]}方向にカテゴリが設定されていません。`)
     }
 
+    const normalizedImage = await normalizeImageForStorage(draft.image)
     const photo: PhotoItem = {
       id: createId('photo'),
-      image: draft.image,
-      imageType: draft.imageType,
+      image: normalizedImage,
+      imageType: normalizedImage.type || draft.imageType,
       categoryId: category.id,
       direction,
       placeId: draft.placeId,

@@ -15,6 +15,7 @@ const locationMessage = ref('')
 const error = ref('')
 
 const selectedPlace = computed(() => places.value.find((place) => place.id === selectedPlaceId.value) || null)
+const selectedPlaceName = computed(() => selectedPlace.value?.name || '場所未選択')
 const hasPlaces = computed(() => places.value.length > 0)
 
 function revokePreview() {
@@ -132,7 +133,7 @@ onUnmounted(revokePreview)
 <template>
   <AppShell>
     <h1 class="page-title">撮影</h1>
-    <p class="page-lead">スマホではカメラが起動します。撮影後にプレビューを確認して分類へ進みます。</p>
+    <p class="page-lead">撮影前に場所を確認し、写真選択後はそのまま分類画面へ進みます。</p>
 
     <section class="capture-panel">
       <section class="form-panel">
@@ -143,13 +144,13 @@ onUnmounted(revokePreview)
 
         <div class="field">
           <span>現在の選択場所</span>
-          <strong>{{ selectedPlace ? selectedPlace.name : '場所未選択' }}</strong>
+          <strong>{{ selectedPlaceName }}</strong>
         </div>
 
         <template v-if="hasPlaces">
           <label class="field">
             <span>場所を手動で選択</span>
-            <select v-model="selectedPlaceId">
+            <select v-model="selectedPlaceId" :disabled="isLocating">
               <option value="">場所未選択</option>
               <option v-for="place in places" :key="place.id" :value="place.id">
                 {{ place.name }}
@@ -158,7 +159,7 @@ onUnmounted(revokePreview)
           </label>
 
           <div class="button-row">
-            <button class="secondary-button" type="button" @click="requestCurrentLocation">
+            <button class="secondary-button" type="button" :disabled="isLocating" @click="requestCurrentLocation">
               現在地から再選択
             </button>
           </div>

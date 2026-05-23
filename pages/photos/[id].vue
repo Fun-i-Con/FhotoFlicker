@@ -1,13 +1,21 @@
 <script setup lang="ts">
-import { directionLabels, type Category, type PhotoItem } from '~/types/photo'
+import { directionLabels, type Category, type PhotoItem, type Place } from '~/types/photo'
 
 const route = useRoute()
 const db = usePhotoDb()
 const photo = ref<PhotoItem | null>(null)
 const categories = ref<Category[]>([])
+const places = ref<Place[]>([])
 const imageUrl = ref('')
 
 const category = computed(() => categories.value.find((item) => item.id === photo.value?.categoryId))
+const placeName = computed(() => {
+  if (!photo.value?.placeId) {
+    return '場所未設定'
+  }
+
+  return places.value.find((item) => item.id === photo.value?.placeId)?.name || '場所未設定'
+})
 
 function revokeImage() {
   if (imageUrl.value) {
@@ -19,6 +27,7 @@ function revokeImage() {
 async function load() {
   await db.init()
   categories.value = await db.getCategories()
+  places.value = await db.getPlaces()
   const id = Array.isArray(route.params.id) ? route.params.id[0] : route.params.id
   photo.value = await db.getPhoto(id) || null
   revokeImage()
@@ -52,11 +61,15 @@ onUnmounted(revokeImage)
     <section v-if="photo && imageUrl" class="detail-panel">
       <img class="detail-image" :src="imageUrl" alt="写真詳細" />
       <h2 class="section-title">分類情報</h2>
-      <CategoryBadge :category="category" label="削除済みカテゴリ" />
+      <p class="meta">場所: {{ placeName }}</p>
+      <div class="field">
+        <span>工程</span>
+        <CategoryBadge :category="category" label="削除済み工程" />
+      </div>
       <p class="meta">方向: {{ directionLabels[photo.direction] }}</p>
       <p class="meta">保存日時: {{ new Date(photo.createdAt).toLocaleString('ja-JP') }}</p>
       <div class="button-row">
-        <NuxtLink class="secondary-button" :to="`/photos?category=${photo.categoryId}`">同じカテゴリを見る</NuxtLink>
+        <NuxtLink class="secondary-button" :to="`/photos?category=${photo.categoryId}`">同じ工程を見る</NuxtLink>
         <button class="danger-button" type="button" @click="removePhoto">削除</button>
       </div>
     </section>

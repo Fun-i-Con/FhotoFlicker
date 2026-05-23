@@ -7,7 +7,7 @@ defineProps<{
 </script>
 
 <template>
-  <section class="direction-map" aria-label="フリック方向の設定">
+  <section class="direction-map" aria-label="フリック方向と工程の対応">
     <div
       v-for="direction in flickDirections"
       :key="direction"

@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { navigateTo } from 'nuxt/app'
 import { usePhotoDb } from '~/composables/usePhotoDb'
 import type { Place } from '~/types/photo'
 
 const db = usePhotoDb()
-const previewUrl = ref('')
-const selectedFile = ref<File | null>(null)
 const places = ref<Place[]>([])
 const selectedPlaceId = ref('')
 const isLocating = ref(false)
@@ -17,13 +15,6 @@ const error = ref('')
 const selectedPlace = computed(() => places.value.find((place) => place.id === selectedPlaceId.value) || null)
 const selectedPlaceName = computed(() => selectedPlace.value?.name || '場所未選択')
 const hasPlaces = computed(() => places.value.length > 0)
-
-function revokePreview() {
-  if (previewUrl.value) {
-    URL.revokeObjectURL(previewUrl.value)
-    previewUrl.value = ''
-  }
-}
 
 function getLocationErrorMessage(code: number) {
   switch (code) {
@@ -101,25 +92,20 @@ async function handleFile(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
 
-  revokePreview()
-  selectedFile.value = file || null
   error.value = ''
 
-  if (file) {
-    previewUrl.value = URL.createObjectURL(file)
-    await saveAndClassify()
-  }
-}
-
-async function saveAndClassify() {
-  if (!selectedFile.value) {
+  if (!file) {
     error.value = '写真を選択してください。'
     return
   }
 
+  await saveAndClassify(file)
+}
+
+async function saveAndClassify(file: File) {
   try {
     await db.init()
-    await db.saveDraft(selectedFile.value, selectedPlaceId.value || undefined)
+    await db.saveDraft(file, selectedPlaceId.value || undefined)
     await navigateTo('/classify')
   } catch (err) {
     error.value = err instanceof Error ? err.message : '保存に失敗しました。'
@@ -127,7 +113,6 @@ async function saveAndClassify() {
 }
 
 onMounted(initializeCapture)
-onUnmounted(revokePreview)
 </script>
 
 <template>
@@ -181,16 +166,7 @@ onUnmounted(revokePreview)
         @change="handleFile"
       />
 
-      <img v-if="previewUrl" class="preview-image" :src="previewUrl" alt="撮影画像プレビュー" />
-      <p v-else class="empty-state">まだ写真が選択されていません。</p>
-
       <p v-if="error" class="message error">{{ error }}</p>
-      <div class="button-row">
-        <button class="primary-button" type="button" :disabled="!selectedFile" @click="saveAndClassify">
-          分類へ進む
-        </button>
-        <NuxtLink class="secondary-button" to="/">戻る</NuxtLink>
-      </div>
     </section>
   </AppShell>
 </template>

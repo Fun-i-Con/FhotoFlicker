@@ -131,7 +131,8 @@ async function seedCategories() {
   const now = new Date().toISOString()
   const defaults: Category[] = flickDirections.map((direction) => ({
     id: createId('cat'),
-    name: `${directionLabels[direction]}カテゴリ`,
+    name: `${directionLabels[direction]}工程`,
+
     color: defaultColors[direction],
     direction,
     createdAt: now,

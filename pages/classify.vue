@@ -5,6 +5,7 @@ import {
   type Category,
   type DraftPhoto,
   type FlickDirection,
+  type PhotoItem,
   type Place
 } from '~/types/photo'
 
@@ -14,6 +15,8 @@ const places = ref<Place[]>([])
 const draft = ref<DraftPhoto | null>(null)
 const imageUrl = ref('')
 const error = ref('')
+const lastClassifiedPhoto = ref<PhotoItem | null>(null)
+const showDetailButton = computed(() => Boolean(lastClassifiedPhoto.value))
 const startPoint = ref<{ x: number; y: number } | null>(null)
 const activeDirection = ref<FlickDirection | null>(null)
 const currentPlaceName = computed(() => {
@@ -31,16 +34,22 @@ function revokeImage() {
   }
 }
 
-async function load() {
-  await db.init()
-  categories.value = await db.getCategories()
-  places.value = await db.getPlaces()
-  draft.value = await db.getLatestDraft()
+async function loadCurrentDraft() {
+  const drafts = await db.getDrafts()
+  const queuedDrafts = [...drafts].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  draft.value = queuedDrafts[0] || null
   revokeImage()
 
   if (draft.value) {
     imageUrl.value = db.createObjectUrl(draft.value)
   }
+}
+
+async function load() {
+  await db.init()
+  categories.value = await db.getCategories()
+  places.value = await db.getPlaces()
+  await loadCurrentDraft()
 }
 
 function resolveDirection(deltaX: number, deltaY: number): FlickDirection | null {
@@ -94,7 +103,8 @@ async function classify(direction: FlickDirection) {
 
   try {
     const photo = await db.classifyDraft(draft.value, direction)
-    await navigateTo(`/photos/${photo.id}`)
+    lastClassifiedPhoto.value = photo
+    await loadCurrentDraft()
   } catch (err) {
     error.value = err instanceof Error ? err.message : '分類に失敗しました。'
   }
@@ -111,7 +121,7 @@ onUnmounted(revokeImage)
 <template>
   <AppShell>
     <h1 class="page-title">フリック分類</h1>
-    <p class="page-lead">写真を上下左右にフリックすると、対応する工程へ保存されます。</p>
+    <p class="page-lead">撮影した順に次の写真が出てくるので、1枚ずつ分類していけます。</p>
 
     <DirectionMap :categories="categories" />
 
@@ -152,6 +162,9 @@ onUnmounted(revokeImage)
     <p v-if="error" class="message error">{{ error }}</p>
 
     <div class="button-row">
+      <button v-if="showDetailButton" class="secondary-button" type="button" @click="() => navigateTo(`/photos/${lastClassifiedPhoto?.id}`)">
+        詳細を見る
+      </button>
       <NuxtLink class="primary-button" to="/capture">撮影する</NuxtLink>
       <NuxtLink class="secondary-button" to="/photos">一覧を見る</NuxtLink>
     </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { navigateTo } from 'nuxt/app'
 import { usePhotoDb } from '~/composables/usePhotoDb'
 import type { Place } from '~/types/photo'
@@ -11,6 +11,9 @@ const isLocating = ref(false)
 const locationError = ref('')
 const locationMessage = ref('')
 const error = ref('')
+const pendingDraftId = ref('')
+const photoInput = ref<HTMLInputElement | null>(null)
+const continuousMode = ref(true)
 
 const selectedPlace = computed(() => places.value.find((place) => place.id === selectedPlaceId.value) || null)
 const selectedPlaceName = computed(() => selectedPlace.value?.name || '場所未選択')
@@ -88,6 +91,20 @@ async function initializeCapture() {
   }
 }
 
+function resetPhotoInput() {
+  if (photoInput.value) {
+    photoInput.value.value = ''
+  }
+}
+
+async function openPhotoPicker() {
+  resetPhotoInput()
+  await nextTick()
+  requestAnimationFrame(() => {
+    photoInput.value?.click()
+  })
+}
+
 async function handleFile(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -105,11 +122,34 @@ async function handleFile(event: Event) {
 async function saveAndClassify(file: File) {
   try {
     await db.init()
-    await db.saveDraft(file, selectedPlaceId.value || undefined)
-    await navigateTo('/classify')
+    const draft = await db.saveDraft(file, selectedPlaceId.value || undefined)
+    pendingDraftId.value = draft.id
+
+    if (!continuousMode.value) {
+      await continueToClassify()
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : '保存に失敗しました。'
   }
+}
+
+async function retakePhoto() {
+  try {
+    await db.init()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '撮影の準備に失敗しました。'
+    return
+  }
+
+  openPhotoPicker()
+}
+
+async function continueToClassify() {
+  if (!pendingDraftId.value) {
+    return
+  }
+
+  await navigateTo('/classify')
 }
 
 onMounted(initializeCapture)
@@ -118,7 +158,7 @@ onMounted(initializeCapture)
 <template>
   <AppShell>
     <h1 class="page-title">撮影</h1>
-    <p class="page-lead">撮影前に場所を確認し、写真選択後はそのまま分類画面へ進みます。</p>
+    <p class="page-lead">撮影前に場所を確認し、写真を保存したあとに分類画面から手動で分類できます。</p>
 
     <section class="capture-panel">
       <section class="form-panel">
@@ -156,8 +196,14 @@ onMounted(initializeCapture)
         </div>
       </section>
 
-      <label class="file-button" for="photo-input">写真を撮影</label>
+      <div class="button-row">
+        <button class="file-button" type="button" @click="openPhotoPicker">{{ continuousMode ? '連続撮影' : '写真を追加' }}</button>
+        <button class="secondary-button" type="button" @click="continuousMode = !continuousMode">
+          {{ continuousMode ? '単発撮影モード' : '連続撮影モード' }}
+        </button>
+      </div>
       <input
+        ref="photoInput"
         id="photo-input"
         class="hidden-input"
         type="file"
@@ -165,6 +211,13 @@ onMounted(initializeCapture)
         capture="environment"
         @change="handleFile"
       />
+
+      <div v-if="pendingDraftId && continuousMode" class="form-panel choice-panel">
+        <p class="message">写真を保存しました。続けて撮影するか、分類画面へ進めます。</p>
+        <div class="button-row">
+          <button class="primary-button" type="button" @click="continueToClassify">分類する</button>
+        </div>
+      </div>
 
       <p v-if="error" class="message error">{{ error }}</p>
     </section>

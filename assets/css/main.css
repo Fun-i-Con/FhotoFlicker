@@ -196,6 +196,12 @@ button {
   padding: 14px;
 }
 
+.choice-panel {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
 .field {
   display: grid;
   gap: 7px;
@@ -443,7 +449,17 @@ button {
 }
 
 .hidden-input {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 @media (min-width: 640px) {

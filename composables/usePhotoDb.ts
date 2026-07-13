@@ -227,6 +227,11 @@ export function usePhotoDb() {
     return drafts.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] || null
   }
 
+  async function getDrafts() {
+    const drafts = await getAllFromStore<DraftPhoto>('drafts')
+    return drafts.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  }
+
   async function clearDraft(id: string) {
     await withStore<undefined>('drafts', 'readwrite', (store) => store.delete(id))
   }
@@ -357,6 +362,8 @@ async function findNearestPlace(latitude: number, longitude: number): Promise<Pl
     deleteCategory,
     saveDraft,
     getLatestDraft,
+    getDrafts,
+    clearDraft,
     classifyDraft,
     getPhotos,
     getPhoto,

@@ -36,7 +36,7 @@ jobs:
         run: npm ci
 
       - name: Generate site
-        run: npm run generate
+        run: npx nuxt build --preset github_pages
         env:
           NUXT_APP_BASE_URL: /FhotoFlicker/
 

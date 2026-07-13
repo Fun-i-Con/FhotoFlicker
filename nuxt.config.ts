@@ -3,7 +3,6 @@ export default defineNuxtConfig({
   ssr: false,
   devtools: { enabled: true },
   app: {
-    baseURL: '/2026hackthon_team_B/',
     head: {
       title: 'Photo Flick Sorter',
       meta: [
@@ -16,8 +15,5 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
   nitro: {
     preset: 'github_pages',
-    output: {
-      publicDir: 'docs'
-    }
   }
 })

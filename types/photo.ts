@@ -21,7 +21,7 @@ export interface Place {
 
 export interface PhotoItem {
   id: string
-  image: Blob
+  image: Blob | ArrayBuffer
   imageType: string
   categoryId: string
   direction: FlickDirection
@@ -31,7 +31,7 @@ export interface PhotoItem {
 
 export interface DraftPhoto {
   id: string
-  image: Blob
+  image: Blob | ArrayBuffer
   imageType: string
   placeId?: string
   createdAt: string

@@ -33,5 +33,5 @@ Nuxt 3 / TypeScript / IndexedDBで作るスマホ向け写真分類MVPです。
 リポジトリ名がサブパスになる場合は次のように生成します。
 
 ```bash
-NUXT_APP_BASE_URL=/your-repo-name/ npm run generate
+NUXT_APP_BASE_URL=/your-repo-name/ npm run `generate
 ```

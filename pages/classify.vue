@@ -11,6 +11,7 @@ import {
 const db = usePhotoDb()
 const categories = ref<Category[]>([])
 const places = ref<Place[]>([])
+const pendingDrafts = ref<DraftPhoto[]>([])
 const draft = ref<DraftPhoto | null>(null)
 const imageUrl = ref('')
 const error = ref('')
@@ -31,16 +32,21 @@ function revokeImage() {
   }
 }
 
-async function load() {
-  await db.init()
-  categories.value = await db.getCategories()
-  places.value = await db.getPlaces()
-  draft.value = await db.getLatestDraft()
+async function loadDrafts() {
+  pendingDrafts.value = await db.getDrafts()
+  draft.value = pendingDrafts.value[0] || null
   revokeImage()
 
   if (draft.value) {
     imageUrl.value = db.createObjectUrl(draft.value)
   }
+}
+
+async function load() {
+  await db.init()
+  categories.value = await db.getCategories()
+  places.value = await db.getPlaces()
+  await loadDrafts()
 }
 
 function resolveDirection(deltaX: number, deltaY: number): FlickDirection | null {
@@ -94,7 +100,11 @@ async function classify(direction: FlickDirection) {
 
   try {
     const photo = await db.classifyDraft(draft.value, direction)
-    await navigateTo(`/photos/${photo.id}`)
+    await loadDrafts()
+
+    if (!draft.value) {
+      await navigateTo(`/photos/${photo.id}`)
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : '分類に失敗しました。'
   }
@@ -116,6 +126,10 @@ onUnmounted(revokeImage)
     <DirectionMap :categories="categories" />
 
     <section v-if="draft && imageUrl" class="classify-stage">
+      <div class="field">
+        <span>分類待ち</span>
+        <strong>{{ pendingDrafts.length }}枚</strong>
+      </div>
       <div class="field">
         <span>現在の場所</span>
         <strong>{{ currentPlaceName }}</strong>

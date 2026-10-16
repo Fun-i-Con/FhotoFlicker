@@ -11,6 +11,7 @@ const isLocating = ref(false)
 const locationError = ref('')
 const locationMessage = ref('')
 const error = ref('')
+const saveMessage = ref('')
 
 const selectedPlace = computed(() => places.value.find((place) => place.id === selectedPlaceId.value) || null)
 const selectedPlaceName = computed(() => selectedPlace.value?.name || '場所未選択')
@@ -88,28 +89,48 @@ async function initializeCapture() {
   }
 }
 
+function resetPhotoInput() {
+  const input = document.getElementById('photo-input') as HTMLInputElement | null
+  if (input) {
+    input.value = ''
+  }
+}
+
 async function handleFile(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
 
   error.value = ''
+  saveMessage.value = ''
 
   if (!file) {
     error.value = '写真を選択してください。'
     return
   }
 
-  await saveAndClassify(file)
+  await savePhotoForLater(file)
 }
 
-async function saveAndClassify(file: File) {
+async function savePhotoForLater(file: File) {
   try {
     await db.init()
     await db.saveDraft(file, selectedPlaceId.value || undefined)
-    await navigateTo('/classify')
+    saveMessage.value = '写真を保存しました。分類するか、続けて撮影できます。'
   } catch (err) {
     error.value = err instanceof Error ? err.message : '保存に失敗しました。'
+  } finally {
+    resetPhotoInput()
   }
+}
+
+async function goToClassification() {
+  await navigateTo('/classify')
+}
+
+function continueCapturing() {
+  saveMessage.value = ''
+  error.value = ''
+  resetPhotoInput()
 }
 
 onMounted(initializeCapture)
@@ -118,7 +139,7 @@ onMounted(initializeCapture)
 <template>
   <AppShell>
     <h1 class="page-title">撮影</h1>
-    <p class="page-lead">撮影前に場所を確認し、写真選択後はそのまま分類画面へ進みます。</p>
+    <p class="page-lead">撮影前に場所を確認し、写真を使用すると保存されてから分類または続けて撮影を選べます。</p>
 
     <section class="capture-panel">
       <section class="form-panel">
@@ -165,6 +186,16 @@ onMounted(initializeCapture)
         capture="environment"
         @change="handleFile"
       />
+
+      <p v-if="saveMessage" class="message">{{ saveMessage }}</p>
+      <div v-if="saveMessage" class="button-row">
+        <button class="primary-button" type="button" @click="goToClassification">
+          分類する
+        </button>
+        <button class="secondary-button" type="button" @click="continueCapturing">
+          続けて撮影する
+        </button>
+      </div>
 
       <p v-if="error" class="message error">{{ error }}</p>
     </section>

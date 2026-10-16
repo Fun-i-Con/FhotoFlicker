@@ -398,78 +398,44 @@ button {
   overflow: hidden;
 }
 
-.photo-image {
-  aspect-ratio: 1;
-}
-
-.photo-card-body {
-  display: grid;
-  gap: 8px;
-  padding: 10px;
-}
-
-.photo-card-meta {
-  display: grid;
-  gap: 2px;
-}
-
-.meta-label {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.detail-image {
-  max-height: 70vh;
+/* 追従アニメーション用 */
+.image-wrapper {
+  position: relative;
+  display: inline-block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-drag: none;
   border-radius: 8px;
+  will-change: transform;
+  transition: none;
+  background: transparent;
 }
 
-.empty-state {
-  padding: 18px;
-  text-align: center;
+.image-tilt {
+  position: relative;
+  transform-style: preserve-3d;
 }
 
-.message {
-  margin: 12px 0;
-  border-radius: 7px;
-  padding: 10px 12px;
-  background: #eef2ff;
-  color: #3730a3;
+/* 画像はラッパーに合わせて描画 */
+.classify-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  pointer-events: none;
+  -webkit-user-drag: none;
 }
 
-.error {
-  background: #fee2e2;
-  color: var(--danger);
+/* オーバーレイ（左右フィードバック） */
+.swipe-overlay {
+  border-radius: 8px;
+  mix-blend-mode: overlay;
+  transition: opacity 120ms linear, background-color 120ms ease;
+  pointer-events: none;
 }
 
-.hidden-input {
-  display: none;
-}
-
-@media (min-width: 640px) {
-  .action-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .photo-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 420px) {
-  .direction-map {
-    gap: 8px;
-  }
-
-  .direction-tile,
-  .direction-center {
-    min-height: 84px;
-    padding: 10px;
-  }
-
-  .direction-target {
-    min-height: 38px;
-    padding: 8px;
-    font-size: 13px;
-  }
+/* 小さな調整 */
+.classify-stage .image-wrapper {
+  max-width: 100%;
+  margin: 0 auto 16px;
 }

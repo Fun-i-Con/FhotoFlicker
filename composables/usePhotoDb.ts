@@ -26,9 +26,11 @@ function createId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
 }
 
-async function normalizeImageForStorage(image: Blob) {
-  const buffer = await image.arrayBuffer()
-  return new Blob([buffer], { type: image.type || 'image/jpeg' })
+async function normalizeImageForStorage(image: Blob | ArrayBuffer) {
+  if (image instanceof Blob) {
+    return await image.arrayBuffer()
+  }
+  return image
 }
 
 function openDb() {
@@ -213,7 +215,7 @@ export function usePhotoDb() {
     const draft: DraftPhoto = {
       id: createId('draft'),
       image: normalizedImage,
-      imageType: normalizedImage.type || 'image/jpeg',
+      imageType: file.type || 'image/jpeg',
       placeId,
       createdAt: new Date().toISOString()
     }
@@ -242,7 +244,7 @@ export function usePhotoDb() {
     const photo: PhotoItem = {
       id: createId('photo'),
       image: normalizedImage,
-      imageType: normalizedImage.type || draft.imageType,
+      imageType: draft.imageType,
       categoryId: category.id,
       direction,
       placeId: draft.placeId,
@@ -282,8 +284,9 @@ export function usePhotoDb() {
     await withStore<undefined>('photos', 'readwrite', (store) => store.delete(id))
   }
 
-  function createObjectUrl(item: Pick<PhotoItem | DraftPhoto, 'image'>) {
-    return URL.createObjectURL(item.image)
+  function createObjectUrl(item: Pick<PhotoItem | DraftPhoto, 'image' | 'imageType'>) {
+    const blob = item.image instanceof Blob ? item.image : new Blob([item.image], { type: item.imageType })
+    return URL.createObjectURL(blob)
   }
 
   // 場所一覧を取得

@@ -12,6 +12,8 @@ const DB_NAME = 'photo-flick-sorter'
 const DB_VERSION = 3
 
 type StoreName = 'categories' | 'drafts' | 'photos' | 'settings' | 'places'
+type StoredDraftPhoto = Omit<DraftPhoto, 'image'> & { image: Blob | ArrayBuffer }
+type StoredPhotoItem = Omit<PhotoItem, 'image'> & { image: Blob | ArrayBuffer }
 
 const defaultColors: Record<FlickDirection, string> = {
   up: '#2563eb',
@@ -27,8 +29,11 @@ function createId(prefix: string) {
 }
 
 async function normalizeImageForStorage(image: Blob) {
-  const buffer = await image.arrayBuffer()
-  return new Blob([buffer], { type: image.type || 'image/jpeg' })
+  return await image.arrayBuffer()
+}
+
+function restoreImageFromStorage(image: Blob | ArrayBuffer, imageType: string) {
+  return image instanceof Blob ? image : new Blob([image], { type: imageType || 'image/jpeg' })
 }
 
 function openDb() {
@@ -212,19 +217,26 @@ export function usePhotoDb() {
     const normalizedImage = await normalizeImageForStorage(file)
     const draft: DraftPhoto = {
       id: createId('draft'),
-      image: normalizedImage,
-      imageType: normalizedImage.type || 'image/jpeg',
+      image: file,
+      imageType: file.type || 'image/jpeg',
       placeId,
       createdAt: new Date().toISOString()
     }
 
-    await withStore<IDBValidKey>('drafts', 'readwrite', (store) => store.put(draft))
+    await withStore<IDBValidKey>('drafts', 'readwrite', (store) => store.put({ ...draft, image: normalizedImage }))
     return draft
   }
 
+  async function getDrafts() {
+    const drafts = await getAllFromStore<StoredDraftPhoto>('drafts')
+    return drafts
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .map((draft) => ({ ...draft, image: restoreImageFromStorage(draft.image, draft.imageType) }))
+  }
+
   async function getLatestDraft() {
-    const drafts = await getAllFromStore<DraftPhoto>('drafts')
-    return drafts.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] || null
+    const drafts = await getDrafts()
+    return drafts[drafts.length - 1] || null
   }
 
   async function clearDraft(id: string) {
@@ -238,24 +250,28 @@ export function usePhotoDb() {
       throw new Error(`${directionLabels[direction]}方向にカテゴリが設定されていません。`)
     }
 
-    const normalizedImage = await normalizeImageForStorage(draft.image)
     const photo: PhotoItem = {
       id: createId('photo'),
-      image: normalizedImage,
-      imageType: normalizedImage.type || draft.imageType,
+      image: draft.image,
+      imageType: draft.imageType,
       categoryId: category.id,
       direction,
       placeId: draft.placeId,
       createdAt: new Date().toISOString()
     }
 
-    await withStore<IDBValidKey>('photos', 'readwrite', (store) => store.put(photo))
+    const normalizedImage = await normalizeImageForStorage(photo.image)
+    await withStore<IDBValidKey>('photos', 'readwrite', (store) => store.put({ ...photo, image: normalizedImage }))
     await clearDraft(draft.id)
     return photo
   }
 
   async function getPhotos(categoryIdOrFilters?: string | { placeId?: string; categoryId?: string }) {
-    const photos = await getAllFromStore<PhotoItem>('photos')
+    const storedPhotos = await getAllFromStore<StoredPhotoItem>('photos')
+    const photos = storedPhotos.map((photo) => ({
+      ...photo,
+      image: restoreImageFromStorage(photo.image, photo.imageType)
+    }))
     
     // categoryId 単体を渡された場合の互換性保持
     if (typeof categoryIdOrFilters === 'string') {
@@ -275,7 +291,8 @@ export function usePhotoDb() {
   }
 
   async function getPhoto(id: string) {
-    return await withStore<PhotoItem | undefined>('photos', 'readonly', (store) => store.get(id))
+    const photo = await withStore<StoredPhotoItem | undefined>('photos', 'readonly', (store) => store.get(id))
+    return photo ? { ...photo, image: restoreImageFromStorage(photo.image, photo.imageType) } : undefined
   }
 
   async function deletePhoto(id: string) {
@@ -356,6 +373,7 @@ async function findNearestPlace(latitude: number, longitude: number): Promise<Pl
     saveCategory,
     deleteCategory,
     saveDraft,
+    getDrafts,
     getLatestDraft,
     classifyDraft,
     getPhotos,

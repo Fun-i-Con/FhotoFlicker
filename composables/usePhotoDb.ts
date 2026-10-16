@@ -7,6 +7,7 @@ import {
   type PhotoItem,
   type Place
 } from '~/types/photo'
+import { selectNearestPlace } from '~/utils/geo'
 
 const DB_NAME = 'photo-flick-sorter'
 const DB_VERSION = 3
@@ -316,36 +317,9 @@ async function deletePlace(id: string) {
   await withStore<undefined>('places', 'readwrite', (store) => store.delete(id))
 }
 
-// 現在地から最寄り場所を見つける（Haversine公式を使用）
+// 現在地から最寄り場所を見つける
 async function findNearestPlace(latitude: number, longitude: number): Promise<Place | null> {
-  const places = await getPlaces()
-  
-  if (places.length === 0) return null
-
-  // Haversine公式で距離を計算
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371 // 地球の半径（km）
-    const dLat = ((lat2 - lat1) * Math.PI) / 180
-    const dLon = ((lon2 - lon1) * Math.PI) / 180
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-    return R * c * 1000 // メートル単位
-  }
-
-  let nearest: Place | null = null
-  let minDistance = Infinity
-
-  places.forEach((place) => {
-    const distance = calculateDistance(latitude, longitude, place.latitude, place.longitude)
-    if (distance <= place.radiusMeters && distance < minDistance) {
-      nearest = place
-      minDistance = distance
-    }
-  })
-
-  return nearest
+  return selectNearestPlace(await getPlaces(), latitude, longitude)
 }
 
   return {

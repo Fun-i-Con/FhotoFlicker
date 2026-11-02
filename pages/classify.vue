@@ -5,6 +5,7 @@ import {
   type Category,
   type DraftPhoto,
   type FlickDirection,
+  type PhotoItem,
   type Place
 } from '~/types/photo'
 import { resolveDirection } from '~/utils/flick'
@@ -16,6 +17,8 @@ const pendingDrafts = ref<DraftPhoto[]>([])
 const draft = ref<DraftPhoto | null>(null)
 const imageUrl = ref('')
 const error = ref('')
+const isClassifying = ref(false)
+const lastClassifiedPhoto = ref<PhotoItem | null>(null)
 const startPoint = ref<{ x: number; y: number } | null>(null)
 const activeDirection = ref<FlickDirection | null>(null)
 const currentPlaceName = computed(() => {
@@ -80,13 +83,21 @@ async function handlePointerEnd(event: PointerEvent) {
 async function classify(direction: FlickDirection) {
   error.value = ''
 
+  // 保存中の連打で同じ下書きが二重に保存されるのを防ぐ
+  if (isClassifying.value) {
+    return
+  }
+
   if (!draft.value) {
     error.value = '分類待ちの写真がありません。'
     return
   }
 
+  isClassifying.value = true
+
   try {
     const photo = await db.classifyDraft(draft.value, direction)
+    lastClassifiedPhoto.value = photo
     await loadDrafts()
 
     if (!draft.value) {
@@ -94,6 +105,14 @@ async function classify(direction: FlickDirection) {
     }
   } catch (err) {
     error.value = err instanceof Error ? err.message : '分類に失敗しました。'
+  } finally {
+    isClassifying.value = false
+  }
+}
+
+async function openLastClassifiedPhoto() {
+  if (lastClassifiedPhoto.value) {
+    await navigateTo(`/photos/${lastClassifiedPhoto.value.id}`)
   }
 }
 
@@ -142,6 +161,7 @@ onUnmounted(revokeImage)
           :key="direction"
           class="secondary-button"
           type="button"
+          :disabled="isClassifying"
           @click="classify(direction)"
         >
           {{ directionLabels[direction] }}
@@ -153,6 +173,9 @@ onUnmounted(revokeImage)
     <p v-if="error" class="message error">{{ error }}</p>
 
     <div class="button-row">
+      <button v-if="lastClassifiedPhoto" class="secondary-button" type="button" @click="openLastClassifiedPhoto">
+        直前の写真の詳細を見る
+      </button>
       <NuxtLink class="primary-button" to="/capture">撮影する</NuxtLink>
       <NuxtLink class="secondary-button" to="/photos">一覧を見る</NuxtLink>
     </div>

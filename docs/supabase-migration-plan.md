@@ -59,8 +59,7 @@ Supabase は PostgreSQL に、認証・ファイル保存（Storage）・自動�
 
 ### 1. 準備
 
-- PR #37（連続撮影）をマージする
-- #36 の内容を「未分類写真を一覧で見られるようにする」に絞って書き直す
+- PR #39（撮影後の保存と連続分類）をマージする
 
 ### 2. Repository への分割（Supabase は使わない）
 
@@ -68,7 +67,7 @@ Supabase は PostgreSQL に、認証・ファイル保存（Storage）・自動�
 
 - 2-a: 場所判定とフリック方向の判定を純粋な関数に切り出し、Vitest でテストする
   - `utils/geo.ts`、`utils/flick.ts`、`test/unit/`
-- 2-b: `usePhotoDb.ts` を Repository のインターフェースと IndexedDB 版の実装に分ける（PR #37 のマージ後に行う）
+- 2-b: `usePhotoDb.ts` を Repository のインターフェースと IndexedDB 版の実装に分ける（PR #39 のマージ後に行う）
   - 例: `PhotoRepository`、`CategoryRepository`、`PlaceRepository`
   - 画面は Repository だけを呼ぶようにする
   - 画像の取得は `createObjectUrl(Blob)` ではなく「画像 URL を返す」形にする。Supabase では Storage の URL を返すことになるため
@@ -250,7 +249,7 @@ create policy "photos_obj_delete_own" on storage.objects for delete to authentic
 | 手順 | 状況 |
 | --- | --- |
 | 方針決め | 未着手（チームで決める） |
-| 1. 準備 | PR #37 レビュー中 |
+| 1. 準備 | PR #39 修正中 |
 | 2-a. 純粋な関数の切り出し | 実装済み（ブランチ `refactor-pure-functions`） |
-| 2-b. Repository への分割 | PR #37 のマージ待ち |
+| 2-b. Repository への分割 | PR #39 のマージ待ち |
 | 3〜7 | 未着手 |

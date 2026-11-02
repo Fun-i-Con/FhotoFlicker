@@ -7,6 +7,7 @@ import {
   type FlickDirection,
   type Place
 } from '~/types/photo'
+import { resolveDirection } from '~/utils/flick'
 
 const db = usePhotoDb()
 const categories = ref<Category[]>([])
@@ -47,20 +48,6 @@ async function load() {
   categories.value = await db.getCategories()
   places.value = await db.getPlaces()
   await loadDrafts()
-}
-
-function resolveDirection(deltaX: number, deltaY: number): FlickDirection | null {
-  const threshold = 52
-
-  if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < threshold) {
-    return null
-  }
-
-  if (Math.abs(deltaX) > Math.abs(deltaY)) {
-    return deltaX > 0 ? 'right' : 'left'
-  }
-
-  return deltaY > 0 ? 'down' : 'up'
 }
 
 function handlePointerStart(event: PointerEvent) {

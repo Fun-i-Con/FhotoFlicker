@@ -8,7 +8,7 @@ defineProps<{
 </script>
 
 <template>
-  <span class="category-badge" :style="{ '--badge-color': category?.color || '#6b7280' }">
+  <span class="category-badge" :style="{ '--badge-color': category?.color }">
     <span class="badge-dot" />
     <span>{{ category ? category.name : label || '未設定' }}</span>
     <small v-if="category">{{ directionLabels[category.direction] }}</small>

@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { directionLabels, flickDirections, type Category, type FlickDirection } from '~/types/photo'
 
+const initialColors: Record<FlickDirection, string> = {
+  up: '#1d4ed8',
+  right: '#facc15',
+  down: '#15803d',
+  left: '#e879f9'
+}
+
 const db = usePhotoDb()
 const categories = ref<Category[]>([])
 const message = ref('')
@@ -8,7 +15,7 @@ const error = ref('')
 const form = reactive({
   id: '',
   name: '',
-  color: '#2563eb',
+  color: initialColors.up,
   direction: 'up' as FlickDirection
 })
 
@@ -22,10 +29,16 @@ async function load() {
 function resetForm() {
   form.id = ''
   form.name = ''
-  form.color = '#2563eb'
+  form.color = initialColors.up
   form.direction = 'up'
   error.value = ''
 }
+
+watch(() => form.direction, (direction, previousDirection) => {
+  if (!isEditing.value && form.color === initialColors[previousDirection]) {
+    form.color = initialColors[direction]
+  }
+})
 
 function editCategory(category: Category) {
   form.id = category.id

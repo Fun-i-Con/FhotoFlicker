@@ -25,7 +25,7 @@ function categoryFor(direction: keyof typeof directionArrows) {
       class="direction-tile"
       :class="`direction-${direction}`"
       :style="{
-        '--tile-color': categoryFor(direction)?.color || '#9ca3af'
+        '--tile-color': categoryFor(direction)?.color
       }"
     >
       <div class="direction-tile-header">

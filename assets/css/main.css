@@ -35,6 +35,11 @@ a {
   text-decoration: none;
 }
 
+:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+}
+
 button,
 input,
 select {
@@ -124,6 +129,109 @@ button {
 .category-list {
   display: grid;
   gap: 12px;
+}
+
+.home-overview,
+.home-link-list {
+  display: grid;
+  gap: 12px;
+}
+
+.home-priority {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--surface);
+}
+
+.home-priority-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.home-priority-count {
+  margin: 0;
+  color: var(--muted);
+}
+
+.home-priority-count strong {
+  color: var(--text);
+  font-size: 26px;
+}
+
+.home-priority-description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.home-thumbnail-stack {
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+}
+
+.home-thumbnail-stack img,
+.home-thumbnail-extra {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  margin-left: -8px;
+  border: 2px solid var(--surface);
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--surface-soft);
+}
+
+.home-thumbnail-extra {
+  display: grid;
+  place-items: center;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.home-priority-button {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.home-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--surface);
+}
+
+.home-link-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.home-link-status {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.home-link-arrow {
+  color: var(--muted);
+  font-size: 20px;
+}
+
+.home-link-row-categories .home-link-arrow {
+  grid-column: 2;
+  grid-row: 1;
 }
 
 .action-card,
@@ -355,6 +463,65 @@ button {
   font-weight: 700;
 }
 
+.direction-map-compact {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  width: 168px;
+  margin: 0;
+  justify-self: center;
+}
+
+.direction-map-compact .direction-tile,
+.direction-map-compact .direction-center {
+  min-height: 34px;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 5px;
+}
+
+.direction-map-compact .direction-tile-header {
+  justify-content: center;
+  gap: 3px;
+}
+
+.direction-map-compact .direction-arrow {
+  width: 16px;
+  height: 16px;
+  font-size: 11px;
+}
+
+.direction-map-compact .direction-tile-header strong,
+.direction-map-compact .direction-target,
+.direction-map-compact .direction-center-label,
+.direction-map-compact .direction-center strong {
+  font-size: 9px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.direction-map-compact .direction-target {
+  display: block;
+  min-height: 0;
+  padding: 2px;
+  text-align: center;
+}
+
+.direction-map-compact .direction-center {
+  align-content: center;
+  padding: 2px;
+  text-align: center;
+}
+
+.direction-map-compact .direction-center-label {
+  font-size: 8px;
+}
+
+.direction-map-compact .direction-center strong {
+  display: none;
+}
+
 .preview-image,
 .photo-image,
 .detail-image,
@@ -451,12 +618,51 @@ button {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .home-priority-capture {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .home-priority-capture .home-priority-button {
+    grid-column: auto;
+    width: auto;
+  }
+
   .photo-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
+@media (min-width: 768px) {
+  .home-overview {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    align-items: start;
+  }
+
+  .home-link-row-categories {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .home-link-row-categories .direction-map-compact {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+
 @media (max-width: 420px) {
+  .home-priority {
+    padding: 12px;
+  }
+
+  .home-thumbnail-stack img,
+  .home-thumbnail-extra {
+    width: 40px;
+    height: 40px;
+  }
+
+  .home-link-row {
+    padding: 12px;
+  }
+
   .direction-map {
     gap: 8px;
   }

@@ -10,7 +10,7 @@ import {
 } from '~/types/photo'
 import { resolveDirection } from '~/utils/flick'
 
-const db = usePhotoDb()
+const { categoryRepository, placeRepository, photoRepository } = useRepositories()
 const categories = ref<Category[]>([])
 const places = ref<Place[]>([])
 const pendingDrafts = ref<DraftPhoto[]>([])
@@ -31,25 +31,25 @@ const currentPlaceName = computed(() => {
 
 function revokeImage() {
   if (imageUrl.value) {
-    URL.revokeObjectURL(imageUrl.value)
+    photoRepository.releaseImageUrl(imageUrl.value)
     imageUrl.value = ''
   }
 }
 
 async function loadDrafts() {
-  pendingDrafts.value = await db.getDrafts()
+  pendingDrafts.value = await photoRepository.listDrafts()
   draft.value = pendingDrafts.value[0] || null
   revokeImage()
 
   if (draft.value) {
-    imageUrl.value = db.createObjectUrl(draft.value)
+    const urls = await photoRepository.getImageUrls([draft.value.id])
+    imageUrl.value = urls.get(draft.value.id) || ''
   }
 }
 
 async function load() {
-  await db.init()
-  categories.value = await db.getCategories()
-  places.value = await db.getPlaces()
+  categories.value = await categoryRepository.list()
+  places.value = await placeRepository.list()
   await loadDrafts()
 }
 
@@ -96,7 +96,7 @@ async function classify(direction: FlickDirection) {
   isClassifying.value = true
 
   try {
-    const photo = await db.classifyDraft(draft.value, direction)
+    const photo = await photoRepository.classify(draft.value.id, direction)
     lastClassifiedPhoto.value = photo
     await loadDrafts()
 

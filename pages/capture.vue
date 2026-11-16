@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { navigateTo } from 'nuxt/app'
-import { usePhotoDb } from '~/composables/usePhotoDb'
+import { useRepositories } from '~/composables/useRepositories'
 import type { Place } from '~/types/photo'
+import { selectNearestPlace } from '~/utils/geo'
 
-const db = usePhotoDb()
+const { placeRepository, photoRepository } = useRepositories()
 const places = ref<Place[]>([])
 const selectedPlaceId = ref('')
 const isLocating = ref(false)
@@ -29,7 +30,7 @@ function getLocationErrorMessage(code: number) {
 }
 
 async function loadPlaces() {
-  places.value = await db.getPlaces()
+  places.value = await placeRepository.list()
 }
 
 function requestCurrentLocation() {
@@ -51,7 +52,7 @@ function requestCurrentLocation() {
   navigator.geolocation.getCurrentPosition(
     async (position) => {
       try {
-        const nearestPlace = await db.findNearestPlace(position.coords.latitude, position.coords.longitude)
+        const nearestPlace = selectNearestPlace(await placeRepository.list(), position.coords.latitude, position.coords.longitude)
         selectedPlaceId.value = nearestPlace?.id || ''
         locationMessage.value = nearestPlace
           ? `現在地に最も近い場所として「${nearestPlace.name}」を選択しました。`
@@ -81,7 +82,6 @@ async function initializeCapture() {
   locationMessage.value = ''
 
   try {
-    await db.init()
     await loadPlaces()
     requestCurrentLocation()
   } catch (err) {
@@ -113,8 +113,7 @@ async function handleFile(event: Event) {
 
 async function savePhotoForLater(file: File) {
   try {
-    await db.init()
-    await db.saveDraft(file, selectedPlaceId.value || undefined)
+    await photoRepository.addDraft(file, selectedPlaceId.value || undefined)
     saveMessage.value = '写真を保存しました。分類するか、続けて撮影できます。'
   } catch (err) {
     error.value = err instanceof Error ? err.message : '保存に失敗しました。'

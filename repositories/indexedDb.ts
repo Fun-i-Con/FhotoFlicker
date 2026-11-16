@@ -7,14 +7,20 @@ import {
   type PhotoItem,
   type Place
 } from '~/types/photo'
-import { selectNearestPlace } from '~/utils/geo'
+import type {
+  CategoryRepository,
+  PhotoRepository,
+  PlaceRepository,
+  Repositories
+} from '~/repositories/types'
 
 const DB_NAME = 'photo-flick-sorter'
 const DB_VERSION = 3
 
 type StoreName = 'categories' | 'drafts' | 'photos' | 'settings' | 'places'
-type StoredDraftPhoto = Omit<DraftPhoto, 'image'> & { image: Blob | ArrayBuffer }
-type StoredPhotoItem = Omit<PhotoItem, 'image'> & { image: Blob | ArrayBuffer }
+type StoredImage = Blob | ArrayBuffer
+type StoredDraftPhoto = DraftPhoto & { image: StoredImage }
+type StoredPhotoItem = PhotoItem & { image: StoredImage }
 
 const defaultColors: Record<FlickDirection, string> = {
   up: '#2563eb',
@@ -29,12 +35,20 @@ function createId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
 }
 
-async function normalizeImageForStorage(image: Blob) {
-  return await image.arrayBuffer()
+async function normalizeImageForStorage(image: StoredImage) {
+  return image instanceof Blob ? await image.arrayBuffer() : image
 }
 
-function restoreImageFromStorage(image: Blob | ArrayBuffer, imageType: string) {
+function restoreImageFromStorage(image: StoredImage, imageType: string) {
   return image instanceof Blob ? image : new Blob([image], { type: imageType || 'image/jpeg' })
+}
+
+function toDraft({ image: _image, ...draft }: StoredDraftPhoto): DraftPhoto {
+  return draft
+}
+
+function toPhoto({ image: _image, ...photo }: StoredPhotoItem): PhotoItem {
+  return photo
 }
 
 function openDb() {
@@ -161,34 +175,14 @@ async function seedCategories() {
   return defaults
 }
 
-export function usePhotoDb() {
-  const isReady = useState('photo-db-ready', () => false)
-  const errorMessage = useState<string | null>('photo-db-error', () => null)
-
-  async function init() {
-    try {
-      await openDb()
-      await seedCategories()
-      isReady.value = true
-      errorMessage.value = null
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : 'IndexedDBの初期化に失敗しました。'
-      throw error
-    }
-  }
-
-  async function getCategories() {
+const categoryRepository: CategoryRepository = {
+  async list() {
     const categories = await seedCategories()
     return categories.sort((a, b) => flickDirections.indexOf(a.direction) - flickDirections.indexOf(b.direction))
-  }
+  },
 
-  async function getCategoryByDirection(direction: FlickDirection) {
-    const categories = await getCategories()
-    return categories.find((category) => category.direction === direction)
-  }
-
-  async function saveCategory(input: Pick<Category, 'name' | 'color' | 'direction'> & { id?: string }) {
-    const categories = await getCategories()
+  async save(input) {
+    const categories = await categoryRepository.list()
     const duplicated = categories.find((category) => category.direction === input.direction && category.id !== input.id)
 
     if (duplicated) {
@@ -208,52 +202,79 @@ export function usePhotoDb() {
 
     await withStore<IDBValidKey>('categories', 'readwrite', (store) => store.put(category))
     return category
-  }
+  },
 
-  async function deleteCategory(id: string) {
+  async delete(id) {
     await withStore<undefined>('categories', 'readwrite', (store) => store.delete(id))
   }
+}
 
-  async function saveDraft(file: File, placeId?: string) {
-    const normalizedImage = await normalizeImageForStorage(file)
+const placeRepository: PlaceRepository = {
+  async list() {
+    return await getAllFromStore<Place>('places')
+  },
+
+  async save(input) {
+    const places = await placeRepository.list()
+    const existing = input.id ? places.find((place) => place.id === input.id) : undefined
+
+    const now = new Date().toISOString()
+    const place: Place = {
+      id: input.id || createId('place'),
+      name: input.name.trim(),
+      latitude: input.latitude,
+      longitude: input.longitude,
+      radiusMeters: input.radiusMeters,
+      createdAt: existing?.createdAt || now,
+      updatedAt: now
+    }
+
+    await withStore<IDBValidKey>('places', 'readwrite', (store) => store.put(place))
+    return place
+  },
+
+  async delete(id) {
+    await withStore<undefined>('places', 'readwrite', (store) => store.delete(id))
+  }
+}
+
+const photoRepository: PhotoRepository = {
+  async addDraft(file, placeId) {
+    const image = await normalizeImageForStorage(file)
     const draft: DraftPhoto = {
       id: createId('draft'),
-      image: file,
       imageType: file.type || 'image/jpeg',
       placeId,
       createdAt: new Date().toISOString()
     }
 
-    await withStore<IDBValidKey>('drafts', 'readwrite', (store) => store.put({ ...draft, image: normalizedImage }))
+    await withStore<IDBValidKey>('drafts', 'readwrite', (store) => store.put({ ...draft, image }))
     return draft
-  }
+  },
 
-  async function getDrafts() {
+  async listDrafts() {
     const drafts = await getAllFromStore<StoredDraftPhoto>('drafts')
     return drafts
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-      .map((draft) => ({ ...draft, image: restoreImageFromStorage(draft.image, draft.imageType) }))
-  }
+      .map(toDraft)
+  },
 
-  async function getLatestDraft() {
-    const drafts = await getDrafts()
-    return drafts[drafts.length - 1] || null
-  }
-
-  async function clearDraft(id: string) {
-    await withStore<undefined>('drafts', 'readwrite', (store) => store.delete(id))
-  }
-
-  async function classifyDraft(draft: DraftPhoto, direction: FlickDirection) {
-    const category = await getCategoryByDirection(direction)
+  async classify(draftId, direction) {
+    const categories = await categoryRepository.list()
+    const category = categories.find((item) => item.direction === direction)
 
     if (!category) {
       throw new Error(`${directionLabels[direction]}方向にカテゴリが設定されていません。`)
     }
 
+    const draft = await withStore<StoredDraftPhoto | undefined>('drafts', 'readonly', (store) => store.get(draftId))
+
+    if (!draft) {
+      throw new Error('分類待ちの写真が見つかりません。')
+    }
+
     const photo: PhotoItem = {
       id: createId('photo'),
-      image: draft.image,
       imageType: draft.imageType,
       categoryId: category.id,
       direction,
@@ -261,102 +282,57 @@ export function usePhotoDb() {
       createdAt: new Date().toISOString()
     }
 
-    const normalizedImage = await normalizeImageForStorage(photo.image)
-    await withStore<IDBValidKey>('photos', 'readwrite', (store) => store.put({ ...photo, image: normalizedImage }))
-    await clearDraft(draft.id)
+    const image = await normalizeImageForStorage(draft.image)
+    await withStore<IDBValidKey>('photos', 'readwrite', (store) => store.put({ ...photo, image }))
+    await withStore<undefined>('drafts', 'readwrite', (store) => store.delete(draftId))
     return photo
-  }
+  },
 
-  async function getPhotos(categoryIdOrFilters?: string | { placeId?: string; categoryId?: string }) {
-    const storedPhotos = await getAllFromStore<StoredPhotoItem>('photos')
-    const photos = storedPhotos.map((photo) => ({
-      ...photo,
-      image: restoreImageFromStorage(photo.image, photo.imageType)
-    }))
-    
-    // categoryId 単体を渡された場合の互換性保持
-    if (typeof categoryIdOrFilters === 'string') {
-      return photos
-        .filter((photo) => !categoryIdOrFilters || photo.categoryId === categoryIdOrFilters)
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    }
+  async list(filters = {}) {
+    const { categoryId, placeId } = filters
+    const photos = await getAllFromStore<StoredPhotoItem>('photos')
 
-    // フィルターオブジェクトの場合
-    const { categoryId, placeId } = categoryIdOrFilters || {}
     return photos
-      .filter((photo) => 
+      .filter((photo) =>
         (!categoryId || photo.categoryId === categoryId) &&
         (!placeId || photo.placeId === placeId)
       )
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-  }
+      .map(toPhoto)
+  },
 
-  async function getPhoto(id: string) {
+  async get(id) {
     const photo = await withStore<StoredPhotoItem | undefined>('photos', 'readonly', (store) => store.get(id))
-    return photo ? { ...photo, image: restoreImageFromStorage(photo.image, photo.imageType) } : undefined
-  }
+    return photo ? toPhoto(photo) : undefined
+  },
 
-  async function deletePhoto(id: string) {
+  async delete(id) {
     await withStore<undefined>('photos', 'readwrite', (store) => store.delete(id))
-  }
+  },
 
-  function createObjectUrl(item: Pick<PhotoItem | DraftPhoto, 'image'>) {
-    return URL.createObjectURL(item.image)
-  }
+  async getImageUrls(ids) {
+    const urls = new Map<string, string>()
 
-  // 場所一覧を取得
-async function getPlaces() {
-  return await getAllFromStore<Place>('places')
+    for (const id of ids) {
+      const stored =
+        await withStore<StoredPhotoItem | undefined>('photos', 'readonly', (store) => store.get(id)) ||
+        await withStore<StoredDraftPhoto | undefined>('drafts', 'readonly', (store) => store.get(id))
+
+      if (stored) {
+        urls.set(id, URL.createObjectURL(restoreImageFromStorage(stored.image, stored.imageType)))
+      }
+    }
+
+    return urls
+  },
+
+  releaseImageUrl(url) {
+    URL.revokeObjectURL(url)
+  }
 }
 
-// 場所を保存
-async function savePlace(input: Omit<Place, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) {
-  const places = await getPlaces()
-  const existing = input.id ? places.find((place) => place.id === input.id) : undefined
-
-  const now = new Date().toISOString()
-  const place: Place = {
-    id: input.id || createId('place'),
-    name: input.name.trim(),
-    latitude: input.latitude,
-    longitude: input.longitude,
-    radiusMeters: input.radiusMeters,
-    createdAt: existing?.createdAt || now,
-    updatedAt: now
-  }
-
-  await withStore<IDBValidKey>('places', 'readwrite', (store) => store.put(place))
-  return place
-}
-
-// 場所を削除
-async function deletePlace(id: string) {
-  await withStore<undefined>('places', 'readwrite', (store) => store.delete(id))
-}
-
-// 現在地から最寄り場所を見つける
-async function findNearestPlace(latitude: number, longitude: number): Promise<Place | null> {
-  return selectNearestPlace(await getPlaces(), latitude, longitude)
-}
-
-  return {
-    isReady,
-    errorMessage,
-    init,
-    getCategories,
-    saveCategory,
-    deleteCategory,
-    saveDraft,
-    getDrafts,
-    getLatestDraft,
-    classifyDraft,
-    getPhotos,
-    getPhoto,
-    deletePhoto,
-    createObjectUrl,
-    getPlaces,
-    savePlace,
-    deletePlace,
-    findNearestPlace
-  }
+export const indexedDbRepositories: Repositories = {
+  categoryRepository,
+  placeRepository,
+  photoRepository
 }

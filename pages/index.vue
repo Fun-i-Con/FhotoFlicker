@@ -1,15 +1,20 @@
 <script setup lang="ts">
 import type { Category, PhotoItem } from '~/types/photo'
 
-const db = usePhotoDb()
+const { categoryRepository, photoRepository } = useRepositories()
 const categories = ref<Category[]>([])
 const photos = ref<PhotoItem[]>([])
 const loading = ref(true)
+const supabase = useSupabase()
+
+async function signOut() {
+  await supabase?.auth.signOut()
+  await navigateTo('/login')
+}
 
 onMounted(async () => {
-  await db.init()
-  categories.value = await db.getCategories()
-  photos.value = await db.getPhotos()
+  categories.value = await categoryRepository.list()
+  photos.value = await photoRepository.list()
   loading.value = false
 })
 </script>
@@ -47,5 +52,9 @@ onMounted(async () => {
         分類済み {{ photos.length }} 件 / 工程 {{ categories.length }} 件
       </div>
     </template>
+
+    <div v-if="supabase" class="button-row">
+      <button class="secondary-button" type="button" @click="signOut">ログアウト</button>
+    </div>
   </AppShell>
 </template>

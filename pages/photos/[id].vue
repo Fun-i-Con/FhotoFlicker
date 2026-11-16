@@ -2,7 +2,7 @@
 import { directionLabels, type Category, type PhotoItem, type Place } from '~/types/photo'
 
 const route = useRoute()
-const db = usePhotoDb()
+const { categoryRepository, placeRepository, photoRepository } = useRepositories()
 const photo = ref<PhotoItem | null>(null)
 const categories = ref<Category[]>([])
 const places = ref<Place[]>([])
@@ -19,21 +19,21 @@ const placeName = computed(() => {
 
 function revokeImage() {
   if (imageUrl.value) {
-    URL.revokeObjectURL(imageUrl.value)
+    photoRepository.releaseImageUrl(imageUrl.value)
     imageUrl.value = ''
   }
 }
 
 async function load() {
-  await db.init()
-  categories.value = await db.getCategories()
-  places.value = await db.getPlaces()
+  categories.value = await categoryRepository.list()
+  places.value = await placeRepository.list()
   const id = Array.isArray(route.params.id) ? route.params.id[0] : route.params.id
-  photo.value = await db.getPhoto(id) || null
+  photo.value = await photoRepository.get(id) || null
   revokeImage()
 
   if (photo.value) {
-    imageUrl.value = db.createObjectUrl(photo.value)
+    const urls = await photoRepository.getImageUrls([photo.value.id])
+    imageUrl.value = urls.get(photo.value.id) || ''
   }
 }
 
@@ -46,7 +46,7 @@ async function removePhoto() {
     return
   }
 
-  await db.deletePhoto(photo.value.id)
+  await photoRepository.delete(photo.value.id)
   await navigateTo('/photos')
 }
 
@@ -69,7 +69,7 @@ onUnmounted(revokeImage)
       <p class="meta">方向: {{ directionLabels[photo.direction] }}</p>
       <p class="meta">保存日時: {{ new Date(photo.createdAt).toLocaleString('ja-JP') }}</p>
       <div class="button-row">
-        <NuxtLink class="secondary-button" :to="`/photos?category=${photo.categoryId}`">同じ工程を見る</NuxtLink>
+        <NuxtLink v-if="photo.categoryId" class="secondary-button" :to="`/photos?category=${photo.categoryId}`">同じ工程を見る</NuxtLink>
         <button class="danger-button" type="button" @click="removePhoto">削除</button>
       </div>
     </section>

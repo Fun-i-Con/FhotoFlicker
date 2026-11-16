@@ -6,7 +6,7 @@ interface PhotoView extends PhotoItem {
 }
 
 const route = useRoute()
-const db = usePhotoDb()
+const { categoryRepository, placeRepository, photoRepository } = useRepositories()
 const categories = ref<Category[]>([])
 const places = ref<Place[]>([])
 const photos = ref<PhotoView[]>([])
@@ -14,22 +14,22 @@ const selectedPlaceId = ref(typeof route.query.place === 'string' ? route.query.
 const selectedCategoryId = ref(typeof route.query.category === 'string' ? route.query.category : '')
 
 function revokePhotos() {
-  photos.value.forEach((photo) => URL.revokeObjectURL(photo.url))
+  photos.value.forEach((photo) => photoRepository.releaseImageUrl(photo.url))
 }
 
 async function load() {
-  await db.init()
-  categories.value = await db.getCategories()
-  places.value = await db.getPlaces()
+  categories.value = await categoryRepository.list()
+  places.value = await placeRepository.list()
   revokePhotos()
-  const items = await db.getPhotos({
+  const items = await photoRepository.list({
     placeId: selectedPlaceId.value || undefined,
     categoryId: selectedCategoryId.value || undefined
   })
-  photos.value = items.map((photo) => ({ ...photo, url: db.createObjectUrl(photo) }))
+  const urls = await photoRepository.getImageUrls(items.map((photo) => photo.id))
+  photos.value = items.map((photo) => ({ ...photo, url: urls.get(photo.id) || '' }))
 }
 
-function categoryById(id: string) {
+function categoryById(id?: string) {
   return categories.value.find((category) => category.id === id)
 }
 

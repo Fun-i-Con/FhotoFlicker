@@ -37,14 +37,14 @@ Supabase は PostgreSQL に、認証・ファイル保存（Storage）・自動�
 
 | 項目 | 案 |
 | --- | --- |
-| データの持ち主 | ユーザーごと（自分の写真だけ見える）。チームで共有する場合は、チームを表すテーブルが追加で必要 |
-| ログイン方法 | メールの 6 桁コード（Email OTP）または Google ログイン。マジックリンクは使わない（下記） |
-| 新規登録を許すか | 許すと、公開されている publishable キーで誰でもアカウントを作り、Storage を使える。招待したユーザーだけにする案もある |
+| データの持ち主 | **決定（2026-11-16）**: ユーザーごと（自分の写真だけ見える） |
+| ログイン方法 | **決定（2026-11-16）**: Google ログインのみ。メールを使わないので、独自 SMTP の設定と、他人のアドレス宛てに送信される悪用への対策が要らない |
+| 新規登録を許すか | **決定（2026-11-16）**: 誰でも登録できる。1 人が Storage の枠を使い切らないよう、写真は 1 人 100 枚・1 枚 2MB までに制限する。Storage へのアップロードは `photos` の行があるパスにだけ許し、枚数の上限を Storage にも効かせる |
 | 工程を削除したときの写真 | 分類済みのまま「工程なし」として残す（`classified_at` で分類済みかを判定）。工程の削除を禁止する（`on delete restrict`）案もある。docs/current-state.md の確認ポイント 7 への答え |
 | 工程の数 | 上下左右の 4 つまで（`direction` は必須）。docs/current-state.md の確認ポイント 5 への答え |
 | オフライン対応 | 最初はオンライン専用。ただしアップロードに失敗したときに再送するか、撮影データを一時的に端末に残すかは決めておく |
 | 既存データの移行 | 移行しない |
-| 開発環境 | Supabase のプロジェクトを開発用と本番用の 2 つ作る。無料プランの有効プロジェクト枠 2 つを使い切る点に注意。手元で `supabase start`（Docker が必要）を使ってもよい |
+| 開発環境 | **決定（2026-11-16）**: Supabase のプロジェクトは 1 つだけ作り、開発中もそれを使う。既存データを移行しないので、公開前は壊しても作り直せるため。公開前にテスト用のアカウントと写真を消す。公開後にテーブルを変えるときは、手元の `supabase start`（Docker が必要）で試してから反映する |
 | Nuxt 4 への更新 | Nuxt 3 は 2026-07-31 でサポート終了（https://nuxt.com/docs/3.x/migration/overview ）。認証を入れる前に Nuxt 4 へ上げるか決める |
 
 マジックリンクを使わない理由:
@@ -78,6 +78,8 @@ Supabase は PostgreSQL に、認証・ファイル保存（Storage）・自動�
 - CLI の流れ: `supabase init` → `supabase link` → `supabase migration new <名前>` で `supabase/migrations/` に SQL を書く → `supabase db push` で反映する
 - テーブル作成と同じマイグレーションに、GRANT・RLS の有効化・ポリシーまで含める。テーブルだけを先に反映すると、RLS のない状態が生まれるため
   - 2026 年から、public スキーマの新しいテーブルは Data API に自動で公開されなくなった。GRANT がないと supabase-js からのクエリが `permission denied` で拒否される（https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically ）
+
+以下の SQL は検討時の案で、実際に反映する内容は `supabase/migrations/20261116000000_initial_schema.sql` にある（枚数の上限と、Storage のアップロード条件が案から変わっている）。
 
 テーブル定義（案）:
 
@@ -249,7 +251,11 @@ create policy "photos_obj_delete_own" on storage.objects for delete to authentic
 | 手順 | 状況 |
 | --- | --- |
 | 方針決め | 未着手（チームで決める） |
-| 1. 準備 | PR #39 修正中 |
-| 2-a. 純粋な関数の切り出し | 実装済み（ブランチ `refactor-pure-functions`） |
-| 2-b. Repository への分割 | PR #39 のマージ待ち |
-| 3〜7 | 未着手 |
+| 1. 準備 | 完了（PR #39 マージ済み） |
+| 2-a. 純粋な関数の切り出し | 完了（PR #40 マージ済み） |
+| 2-b. Repository への分割 | 実装済み（ブランチ `refactor-repository`） |
+| 3. プロジェクト作成とテーブル設計 | 完了（2026-11-16 に反映。4 と 5 の SQL も同じマイグレーションに含めた） |
+| 4. ログインと権限 | ログイン画面と未ログイン時の移動を実装済み。Google ログインの設定と、2 アカウントでの確認は未着手 |
+| 5. 写真の保存 | 実装済み（縮小してアップロード、期限付き URL で表示）。実環境での確認は未着手 |
+| 6. アプリへの組み込みと公開 | Supabase 版 Repository を実装済み。接続先が未設定なら IndexedDB 版で動く。GitHub の Variables 設定は未着手 |
+| 7. 運用 | 未着手 |

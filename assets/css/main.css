@@ -1,6 +1,9 @@
 :root {
   color-scheme: light;
   --color-white: #ffffff;
+  --color-background: #f8fafc;
+  --color-surface: var(--color-white);
+  --color-surface-soft: #eef2f7;
   --color-white-soft: rgba(255, 255, 255, 0.96);
   --color-white-overlay: rgba(255, 255, 255, 0.72);
   --color-surface-glass: var(--color-white-soft);

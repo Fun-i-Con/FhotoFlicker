@@ -11,8 +11,8 @@
   --color-text: #111827;
   --color-text-muted: #6b7280;
   --color-border: #d9e2ec;
-  --color-border-subtle: rgba(255, 255, 255, 0.06);
-  --color-highlight-subtle: rgba(255, 255, 255, 0.08);
+  --color-border-subtle: rgba(17, 24, 39, 0.08);
+  --color-highlight-subtle: rgba(17, 24, 39, 0.06);
   --color-primary: #111827;
   --color-primary-contrast: var(--color-white);
   --color-danger: #b91c1c;

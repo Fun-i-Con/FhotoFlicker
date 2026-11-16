@@ -1,20 +1,25 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { navigateTo } from 'nuxt/app'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { usePhotoDb } from '~/composables/usePhotoDb'
-import type { Place } from '~/types/photo'
+import type { DraftPhoto, Place } from '~/types/photo'
 
 const db = usePhotoDb()
 const places = ref<Place[]>([])
 const selectedPlaceId = ref('')
+const photoInput = ref<HTMLInputElement | null>(null)
+const pendingCount = ref(0)
+const latestDraft = ref<DraftPhoto | null>(null)
+const latestDraftImageUrl = ref('')
 const isLocating = ref(false)
+const isSaving = ref(false)
+const isChangingPlace = ref(false)
 const locationError = ref('')
 const locationMessage = ref('')
 const error = ref('')
 const saveMessage = ref('')
 
 const selectedPlace = computed(() => places.value.find((place) => place.id === selectedPlaceId.value) || null)
-const selectedPlaceName = computed(() => selectedPlace.value?.name || '場所未選択')
+const selectedPlaceName = computed(() => selectedPlace.value?.name || (hasPlaces.value ? '場所未選択' : '場所未登録'))
 const hasPlaces = computed(() => places.value.length > 0)
 
 function getLocationErrorMessage(code: number) {
@@ -30,6 +35,21 @@ function getLocationErrorMessage(code: number) {
 
 async function loadPlaces() {
   places.value = await db.getPlaces()
+}
+
+async function loadDrafts() {
+  const drafts = await db.getDrafts()
+  pendingCount.value = drafts.length
+  latestDraft.value = drafts[drafts.length - 1] || null
+
+  if (latestDraftImageUrl.value) {
+    URL.revokeObjectURL(latestDraftImageUrl.value)
+    latestDraftImageUrl.value = ''
+  }
+
+  if (latestDraft.value) {
+    latestDraftImageUrl.value = db.createObjectUrl(latestDraft.value)
+  }
 }
 
 function requestCurrentLocation() {
@@ -83,6 +103,7 @@ async function initializeCapture() {
   try {
     await db.init()
     await loadPlaces()
+    await loadDrafts()
     requestCurrentLocation()
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'データの読み込みに失敗しました。'
@@ -90,9 +111,8 @@ async function initializeCapture() {
 }
 
 function resetPhotoInput() {
-  const input = document.getElementById('photo-input') as HTMLInputElement | null
-  if (input) {
-    input.value = ''
+  if (photoInput.value) {
+    photoInput.value.value = ''
   }
 }
 
@@ -104,7 +124,6 @@ async function handleFile(event: Event) {
   saveMessage.value = ''
 
   if (!file) {
-    error.value = '写真を選択してください。'
     return
   }
 
@@ -112,91 +131,101 @@ async function handleFile(event: Event) {
 }
 
 async function savePhotoForLater(file: File) {
+  if (isSaving.value) {
+    return
+  }
+
+  isSaving.value = true
   try {
     await db.init()
     await db.saveDraft(file, selectedPlaceId.value || undefined)
-    saveMessage.value = '写真を保存しました。分類するか、続けて撮影できます。'
+    await loadDrafts()
+    saveMessage.value = `保存しました（分類待ち ${pendingCount.value}枚）`
   } catch (err) {
     error.value = err instanceof Error ? err.message : '保存に失敗しました。'
   } finally {
+    isSaving.value = false
     resetPhotoInput()
   }
 }
 
-async function goToClassification() {
-  await navigateTo('/classify')
-}
-
-function continueCapturing() {
-  saveMessage.value = ''
-  error.value = ''
-  resetPhotoInput()
-}
-
 onMounted(initializeCapture)
+
+onUnmounted(() => {
+  if (latestDraftImageUrl.value) {
+    URL.revokeObjectURL(latestDraftImageUrl.value)
+  }
+})
 </script>
 
 <template>
   <AppShell>
     <h1 class="page-title">撮影</h1>
-    <p class="page-lead">撮影前に場所を確認し、写真を使用すると保存されてから分類または続けて撮影を選べます。</p>
-
     <section class="capture-panel">
-      <section class="form-panel">
-        <h2 class="section-title">撮影場所</h2>
-        <p class="message" v-if="isLocating">位置情報を取得しています...</p>
-        <p class="message" v-if="locationMessage">{{ locationMessage }}</p>
-        <p class="message error" v-if="locationError">{{ locationError }}</p>
-
-        <div class="field">
-          <span>現在の選択場所</span>
+      <div class="capture-location">
+        <div>
+          <span>撮影場所</span>
           <strong>{{ selectedPlaceName }}</strong>
         </div>
-
-        <template v-if="hasPlaces">
-          <label class="field">
-            <span>場所を手動で選択</span>
-            <select v-model="selectedPlaceId" :disabled="isLocating">
-              <option value="">場所未選択</option>
-              <option v-for="place in places" :key="place.id" :value="place.id">
-                {{ place.name }}
-              </option>
-            </select>
-          </label>
-
-          <div class="button-row">
-            <button class="secondary-button" type="button" :disabled="isLocating" @click="requestCurrentLocation">
-              現在地から再選択
-            </button>
-          </div>
-        </template>
-
-        <div v-else class="empty-state">
-          <p>登録済みの場所がありません。</p>
-          <NuxtLink class="primary-button" to="/places">場所を登録する</NuxtLink>
-        </div>
-      </section>
-
-      <label class="file-button" for="photo-input">写真を撮影</label>
-      <input
-        id="photo-input"
-        class="hidden-input"
-        type="file"
-        accept="image/*"
-        capture="environment"
-        @change="handleFile"
-      />
-
-      <p v-if="saveMessage" class="message">{{ saveMessage }}</p>
-      <div v-if="saveMessage" class="button-row">
-        <button class="primary-button" type="button" @click="goToClassification">
-          分類する
+        <button
+          v-if="hasPlaces"
+          class="secondary-button place-change-button"
+          type="button"
+          :aria-expanded="isChangingPlace"
+          @click="isChangingPlace = !isChangingPlace"
+        >
+          変更
         </button>
-        <button class="secondary-button" type="button" @click="continueCapturing">
-          続けて撮影する
+        <NuxtLink v-else class="place-register-link" to="/places">場所を登録</NuxtLink>
+      </div>
+
+      <p v-if="isLocating" class="message">位置情報を取得しています...</p>
+      <p v-if="locationMessage" class="message">{{ locationMessage }}</p>
+      <p v-if="locationError" class="message error">{{ locationError }}</p>
+
+      <div v-if="isChangingPlace && hasPlaces" class="capture-place-picker">
+        <label class="field">
+          <span>撮影場所を選択</span>
+          <select v-model="selectedPlaceId" :disabled="isLocating" @change="isChangingPlace = false">
+            <option value="">場所未選択</option>
+            <option v-for="place in places" :key="place.id" :value="place.id">
+              {{ place.name }}
+            </option>
+          </select>
+        </label>
+        <button class="secondary-button" type="button" :disabled="isLocating" @click="requestCurrentLocation">
+          現在地から選択
         </button>
       </div>
 
+      <p v-if="saveMessage" class="message save-message" role="status" aria-live="polite">{{ saveMessage }}</p>
+      <div class="capture-controls" :class="{ 'has-pending': pendingCount > 0 }">
+        <input
+          id="photo-input"
+          ref="photoInput"
+          class="hidden-input"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          aria-label="写真を撮影または選択"
+          :disabled="isSaving"
+          @change="handleFile"
+        />
+        <label
+          class="file-button capture-button"
+          :class="{ 'is-saving': isSaving }"
+          :aria-disabled="isSaving"
+          for="photo-input"
+        >
+          <strong>{{ isSaving ? '保存中...' : '撮影する' }}</strong>
+          <span>カメラを起動／写真を選択</span>
+        </label>
+        <NuxtLink v-if="pendingCount > 0" class="pending-card" to="/classify">
+          <img v-if="latestDraftImageUrl" class="pending-thumbnail" :src="latestDraftImageUrl" alt="" />
+          <span class="pending-card-count">分類待ち {{ pendingCount }}枚</span>
+          <strong>分類する</strong>
+        </NuxtLink>
+      </div>
       <p v-if="error" class="message error">{{ error }}</p>
     </section>
   </AppShell>

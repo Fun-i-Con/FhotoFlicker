@@ -10,6 +10,7 @@ const directionArrows = {
 
 const props = defineProps<{
   categories: Category[]
+  compact?: boolean
 }>()
 
 function categoryFor(direction: keyof typeof directionArrows) {
@@ -18,7 +19,11 @@ function categoryFor(direction: keyof typeof directionArrows) {
 </script>
 
 <template>
-  <section class="direction-map" aria-label="フリック方向と工程の対応">
+  <section
+    class="direction-map"
+    :class="{ 'direction-map-compact': compact }"
+    :aria-label="compact ? '工程ごとのフリック方向' : 'フリック方向と工程の対応'"
+  >
     <div
       v-for="direction in flickDirections"
       :key="direction"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { directionLabels, flickDirections, type Category, type FlickDirection } from '~/types/photo'
 
-const db = usePhotoDb()
+const { categoryRepository } = useRepositories()
 const categories = ref<Category[]>([])
 const message = ref('')
 const error = ref('')
@@ -15,8 +15,7 @@ const form = reactive({
 const isEditing = computed(() => Boolean(form.id))
 
 async function load() {
-  await db.init()
-  categories.value = await db.getCategories()
+  categories.value = await categoryRepository.list()
 }
 
 function resetForm() {
@@ -46,7 +45,7 @@ async function submitCategory() {
   }
 
   try {
-    await db.saveCategory({
+    await categoryRepository.save({
       id: form.id || undefined,
       name: form.name,
       color: form.color,
@@ -65,7 +64,7 @@ async function removeCategory(category: Category) {
     return
   }
 
-  await db.deleteCategory(category.id)
+  await categoryRepository.delete(category.id)
   await load()
   if (form.id === category.id) {
     resetForm()

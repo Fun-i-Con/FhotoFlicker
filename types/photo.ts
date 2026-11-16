@@ -21,9 +21,8 @@ export interface Place {
 
 export interface PhotoItem {
   id: string
-  image: Blob
   imageType: string
-  categoryId: string
+  categoryId?: string
   direction: FlickDirection
   placeId?: string
   createdAt: string
@@ -31,7 +30,6 @@ export interface PhotoItem {
 
 export interface DraftPhoto {
   id: string
-  image: Blob
   imageType: string
   placeId?: string
   createdAt: string

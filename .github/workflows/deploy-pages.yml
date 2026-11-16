@@ -39,6 +39,8 @@ jobs:
         run: npx nuxt build --preset github_pages
         env:
           NUXT_APP_BASE_URL: /FhotoFlicker/
+          NUXT_PUBLIC_SUPABASE_URL: ${{ vars.NUXT_PUBLIC_SUPABASE_URL }}
+          NUXT_PUBLIC_SUPABASE_KEY: ${{ vars.NUXT_PUBLIC_SUPABASE_KEY }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

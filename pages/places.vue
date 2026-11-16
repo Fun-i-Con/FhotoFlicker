@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { usePhotoDb } from '~/composables/usePhotoDb'
+import { useRepositories } from '~/composables/useRepositories'
 import type { Place } from '~/types/photo'
 
-const db = usePhotoDb()
+const { placeRepository } = useRepositories()
 
 const places = ref<Place[]>([])
 const message = ref('')
@@ -24,8 +24,7 @@ const isEditing = computed(() => Boolean(form.id))
 
 async function loadPlaces() {
   try {
-    await db.init()
-    places.value = await db.getPlaces()
+    places.value = await placeRepository.list()
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'データの読み込みに失敗しました。'
   }
@@ -96,7 +95,7 @@ async function submitPlace() {
   }
 
   try {
-    await db.savePlace({
+    await placeRepository.save({
       id: form.id || undefined,
       name: form.name,
       latitude: form.latitude,
@@ -128,7 +127,7 @@ async function removePlace(place: Place) {
   }
 
   try {
-    await db.deletePlace(place.id)
+    await placeRepository.delete(place.id)
     await loadPlaces()
     if (form.id === place.id) {
       resetForm()

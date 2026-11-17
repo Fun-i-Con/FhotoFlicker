@@ -16,11 +16,11 @@ type StoreName = 'categories' | 'drafts' | 'photos' | 'settings' | 'places'
 type StoredDraftPhoto = Omit<DraftPhoto, 'image'> & { image: Blob | ArrayBuffer }
 type StoredPhotoItem = Omit<PhotoItem, 'image'> & { image: Blob | ArrayBuffer }
 
-const defaultColors: Record<FlickDirection, string> = {
-  up: '#2563eb',
-  right: '#16a34a',
-  down: '#f59e0b',
-  left: '#dc2626'
+export const defaultColors: Record<FlickDirection, string> = {
+  up: '#1d4ed8',
+  right: '#facc15',
+  down: '#15803d',
+  left: '#e879f9'
 }
 
 let dbPromise: Promise<IDBDatabase> | undefined
